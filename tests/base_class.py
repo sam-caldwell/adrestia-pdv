@@ -39,7 +39,7 @@ class TestAdrestiaPdvBaseClass(unittest.TestCase):
     def tearDown(self):
         """
             1. terminate service process if alive
-
+            2. cleanup the test data directory.
         :return:
         """
         if self.service_process.is_alive():
