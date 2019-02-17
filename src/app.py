@@ -1,5 +1,4 @@
 from os import mkdir
-from os import getenv
 from glob import glob
 from time import time
 from os import getenv
@@ -9,29 +8,43 @@ from os.path import abspath
 from os.path import join, dirname, exists
 from werkzeug.exceptions import BadRequest
 
-app = Flask(__name__)
 
-results_dir = getenv('RESULTS_DIRECTORY',
-                     join(abspath(dirname(__file__)), 'data'))
-if exists(results_dir):
-    print(f"results_dir exists: '{results_dir}'")
-else:
-    print("creating results_dir")
-    mkdir(results_dir)
+def setup_results_dir() -> str:
+    results_directory = getenv('RESULTS_DIRECTORY',
+                               join(abspath(dirname(__file__)), 'data'))
+    if exists(results_directory):
+        print(f"results_dir exists: '{results_directory}'")
+    else:
+        print("creating results directory")
+        mkdir(results_directory)
+    return results_directory
 
 
-def get_version():
+def get_version() -> str:
     with open(join(dirname(dirname(__file__)), 'VERSION.txt'), 'r') as f:
         return f.read().strip().lower()
 
 
-def get_file_name(name: str) -> str:
+def validate_file_name(name: str) -> bool:
     try:
         name.index(":")
-        raise Exception("An invalid name containing a ':' char passed to pdv.")
+        return False
     except ValueError:
-        pass
-    return join(results_dir, f"{name}.results")
+        return True
+
+
+def get_file_name(name: str) -> str:
+    if validate_file_name(name):
+        return join(results_dir, f"{name}.results")
+    else:
+        raise ValueError(f"Bad PDV result name value {name}")
+
+
+#
+# Initialize the app.
+#
+results_dir = setup_results_dir()
+app = Flask(__name__)
 
 
 @app.route("/")
