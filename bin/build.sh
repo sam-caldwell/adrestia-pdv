@@ -42,4 +42,7 @@ docker images | grep pdv
 echo "Tagging for latest"
 docker tag adrestia-pdv:$VERSION adrestia-pdv:latest
 
+docker push $container_image_name x684867/adrestia-pdv:$VERSION
+docker push $container_image_name x684867/adrestia-pdv:latest
+
 docker images | grep pdv
