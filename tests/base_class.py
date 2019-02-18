@@ -1,7 +1,11 @@
 import time
+import shutil
 import unittest
+from os import makedirs
+from os.path import exists
 from src.app import run_app
 from multiprocessing import Process
+from os.path import dirname, join, abspath
 
 service_host = "127.0.0.1"
 service_port = 8998
@@ -24,13 +28,27 @@ class TestAdrestiaPdvBaseClass(unittest.TestCase):
         :return:
         """
 
-        def service_bootstrap(host: str, port: int):
-            run_app(svc_host=host, svc_port=port)
+        def bootstrap_service(host, port, results_directory):
+            run_app(host, port, results_directory)
 
+        self.results_dir = join(
+            dirname(
+                dirname(
+                    abspath(__file__)
+                )
+            ),
+            "test_data",
+            str(int(time.time() * 10000))
+        )
+        makedirs(self.results_dir)
         p = Process(
-            target=service_bootstrap,
+            target=bootstrap_service,
             name='adrestia_pdv_tests',
-            kwargs={"host": service_host, "port": service_port}
+            kwargs={
+                "host": service_host,
+                "port": service_port,
+                "results_directory": self.results_dir
+            }
         )
         p.start()
         self.service_process = p
@@ -51,6 +69,8 @@ class TestAdrestiaPdvBaseClass(unittest.TestCase):
                 break
         assert not self.service_process.is_alive(), \
             "tearDown expected to stop the service_process"
+        shutil.rmtree(self.results_dir)
+        assert not exists(self.results_dir)
 
     def test_adrestia_test_service_is_running(self):
         """

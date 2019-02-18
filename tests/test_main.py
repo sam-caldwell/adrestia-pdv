@@ -1,10 +1,11 @@
 import time
+import json
 import requests
+from glob import glob
 from os.path import join
 from os.path import exists
 from datetime import datetime
 from src.app import get_version
-from src.app import setup_results_dir
 from tests.base_class import base_url
 from src.app import validate_file_name
 from tests.base_class import TestAdrestiaPdvBaseClass
@@ -17,9 +18,10 @@ class TestMain(TestAdrestiaPdvBaseClass):
         """
             Scan the given endpoint with a set of http methods and ensure
             only those allowed return 200 and all others return 405.
-        :param end_point: http endpoint.
-        :param vectors: expected behavior descriptor
-        :return:
+
+            :param end_point: http endpoint.
+            :param vectors: expected behavior descriptor
+            :return:
         """
         for http in vectors:
             func = http["method"]
@@ -34,7 +36,8 @@ class TestMain(TestAdrestiaPdvBaseClass):
         """
             Running a bunch of tests as steps inside a single test method
             to speed things up (avoiding setup and teardown)
-        :return:
+
+            :return:
         """
 
         def step_version_format():
@@ -61,7 +64,7 @@ class TestMain(TestAdrestiaPdvBaseClass):
             assert int(v_split[2]) == current_day
 
         def step_results_dir():
-            assert exists(setup_results_dir()), "missing results directory"
+            assert exists(self.results_dir), "missing results directory"
 
         def step_validate_filename():
             assert validate_file_name(
@@ -127,8 +130,9 @@ class TestMain(TestAdrestiaPdvBaseClass):
             :return:
         """
         endpoint = f"{base_url}/clear"
-        n = str(int(time.time()*10000))
-        test_file = join(setup_results_dir(), f"test-{n}.results")
+        n = str(int(time.time() * 10000))
+        results_directory = self.results_dir
+        test_file = join(results_directory, f"test-{n}.results")
         assert not exists(test_file), \
             "A Test data file already exists. " \
             "We failed to cleanup after ourselves.  " \
@@ -150,9 +154,143 @@ class TestMain(TestAdrestiaPdvBaseClass):
         assert not exists(test_file), \
             "Expected test file to have been cleared"
 
+    def test_route_submit_scan(self):
+        """
+            Test the /clear route methods
+            :return:
+        """
+
+        endpoint = f"{base_url}/submit/test.route.submit.scan/pass"
+        vectors = [
+            {"method": requests.get, "expected": 200, "text": None},
+            {"method": requests.put, "expected": 405, "text": None},
+            {"method": requests.post, "expected": 405, "text": None},
+            {"method": requests.delete, "expected": 405, "text": None}
+        ]
+        self.check_methods(endpoint, vectors)
+
+    def validate_file_exists(self, test_name):
+        """
+
+            :param test_name:
+            :return:
+        """
+        return exists(join(self.results_dir, f"{test_name}.results"))
+
     def test_route_submit(self):
         """
             Test that we can submit reports and the files are written as
             expected.
             :return:
         """
+        test_name = "test.route.submit"
+        endpoint = f"{base_url}/submit/{test_name}"
+        for method in [requests.get]:
+            test_results = [
+                {"result": "pass", "expects": 200, "text": "OK"},
+                {"result": "fail", "expects": 200, "text": None},
+                {"result": "Pass", "expects": 400, "text": None},
+                {"result": "Fail", "expects": 400, "text": None},
+                {"result": "badResult", "expects": 400, "text": None}
+            ]
+            for data in test_results:
+                result = data["result"]
+                expectation = data["expects"]
+                response = method(f"{endpoint}/{result}")
+                assert response.status_code == expectation, \
+                    f"Expected {expectation} on {method}"
+                if data["text"] is not None:
+                    assert response.text == "OK", \
+                        f"Expected OK text on {method}"
+                assert self.validate_file_exists(test_name), \
+                    f"missing test result:{test_name}."
+
+    def test_route_report(self):
+        """
+            Test that we can generate a PDV report from a set of files.
+            :return:
+        """
+
+        def generate_tests(p: int, t_strategy: str, freq: int) -> (str, str):
+            """
+                This will generate tuples of tests and results (pass,fail)
+                :return:
+            """
+
+            def choose_result(n: int) -> str:
+                """
+                    choose 1 / 5 as failed tests.  This will allow several
+                    passes for every fail, since a single fail will stop
+                    processing.
+                    :param n:
+                    :return:
+                """
+                if t_strategy == "pass":
+                    return "pass"
+                elif t_strategy == "fail":
+                    return "fail"
+                else:
+                    return "fail" if n % freq == 0 else "pass"
+
+            return f"test{p}", choose_result(p)
+
+        def fuzzing_reports(count: int, test_strategy: str, mix_freq):
+            """
+                Given a count of tests to run (test<n>) and a strategy
+                (e.g. all passes, all fails or a mix of a given frequency),
+                submit the reports to the pdv service process then run a
+                report and evalaute the outcome.
+
+                :param count:
+                :param test_strategy:
+                :param mix_freq:
+                :return:
+            """
+            for i in range(0, count):
+                test_name, result = generate_tests(i, test_strategy, mix_freq)
+                endpoint = f"{base_url}/submit/{test_name}/{result}"
+                response = requests.get(endpoint)
+                assert response.status_code == 200, "Expect 200 on submit"
+                assert response.text == "OK", "Expect OK on submit"
+            file_list = glob(join(self.results_dir, "*.results"))
+            assert count == len(file_list), \
+                "file count does not match test count"
+            #
+            # We know that our tests contain fails.
+            # We expect a failed outcome.
+            #
+            endpoint = f"{base_url}/report"
+            response = requests.get(endpoint)
+            assert response.status_code == 200, "Expect 200 on /report"
+            data = json.loads(response.text)
+            assert "result" in data, \
+                "Missing results attribute in response data."
+            assert "count" in data, \
+                "Missing count attribute in response data."
+            assert "error" in data, \
+                "Missing error attribute in response data."
+
+            if data["result"] == "pass":
+                assert strategy != "fail", \
+                    "one fail would fail all, so we cannot have a " \
+                    "passing result."
+            else:
+                assert strategy != "pass", \
+                    "for a passing strategy we expect all passes."
+                assert "name" in data, \
+                    "Missing name attribute in response data."
+                assert "time" in data, \
+                    "Missing time attribute in response data."
+                assert data["result"] == "fail", "Expected failure."
+                assert str(data["time"]) == str(
+                    float(data["time"])), "time is not float"
+            if strategy == "pass":
+                assert data["count"] == count
+            elif strategy == "fail":
+                assert data["count"] == 1
+            else:
+                assert data["count"] == mix_freq, \
+                    "Expected to fail on first test."
+
+        for strategy in ["pass", "fail", "mixed"]:
+            fuzzing_reports(count=100, test_strategy=strategy, mix_freq=5)

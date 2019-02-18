@@ -3,4 +3,4 @@ venv/
 .idea
 *.iml
 *.log
-data/
+test_data/

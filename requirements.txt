@@ -1,4 +1,5 @@
 Flask
+flake8
 pytest
 requests
-flake8
+werkzeug
