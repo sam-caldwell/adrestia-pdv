@@ -18,6 +18,7 @@ export VERSION="$(cat ./VERSION.txt)"
 [[ "$VERSION" == "" ]] && echo "empty version" && exit 1
 
 echo "building $VERSION"
+git tag -a $VERSION -m "version $VERSION build $(date) on $(hostname) by $(whoami)"
 
 (
     git add VERSION.txt && \
@@ -41,8 +42,11 @@ docker images | grep pdv
 
 echo "Tagging for latest"
 docker tag adrestia-pdv:$VERSION adrestia-pdv:latest
+docker tag adrestia-pdv:latest adrestia/adrestia-pdv:$VERSION
+docker tag adrestia-pdv:latest adrestia/adrestia-pdv:latest
 
-docker push $container_image_name x684867/adrestia-pdv:$VERSION
-docker push $container_image_name x684867/adrestia-pdv:latest
+docker push adrestia/adrestia-pdv:$VERSION
+docker push adrestia/adrestia-pdv:latest
+
 
 docker images | grep pdv
