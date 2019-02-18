@@ -54,14 +54,14 @@ class TestMain(TestAdrestiaPdvBaseClass):
             assert int(v_split[1]), "version expects xxxx.<int>.xx"
             assert int(v_split[2]), "version expects xxxx.xx.<int>"
 
-            now = datetime.now()
+            now = datetime.utcnow()
             current_year = now.year
             current_month = now.month
             current_day = now.day
 
-            assert int(v_split[0]) == current_year
-            assert int(v_split[1]) == current_month
-            assert int(v_split[2]) == current_day
+            assert int(v_split[0]) == current_year, "Version YEAR mismatch"
+            assert int(v_split[1]) == current_month, "Version MONTH mismatch"
+            assert int(v_split[2]) == current_day, "Version DAY mismatch"
 
         def step_results_dir():
             assert exists(self.results_dir), "missing results directory"
@@ -252,7 +252,10 @@ class TestMain(TestAdrestiaPdvBaseClass):
                 response = requests.get(endpoint)
                 assert response.status_code == 200, "Expect 200 on submit"
                 assert response.text == "OK", "Expect OK on submit"
+
             file_list = glob(join(self.results_dir, "*.results"))
+            file_list.sort()
+
             assert count == len(file_list), \
                 "file count does not match test count"
             #
@@ -284,13 +287,16 @@ class TestMain(TestAdrestiaPdvBaseClass):
                 assert data["result"] == "fail", "Expected failure."
                 assert str(data["time"]) == str(
                     float(data["time"])), "time is not float"
+
             if strategy == "pass":
-                assert data["count"] == count
+                assert data["count"] == count, \
+                    "Expected to iterate through all tests"
             elif strategy == "fail":
-                assert data["count"] == 1
+                assert data["count"] == 1, \
+                    "Expected to fail on 1st test"
             else:
-                assert data["count"] == mix_freq, \
-                    "Expected to fail on first test."
+                assert data["count"] < count, \
+                    f"Expected to fail on {mix_freq} test."
 
         for strategy in ["pass", "fail", "mixed"]:
-            fuzzing_reports(count=100, test_strategy=strategy, mix_freq=5)
+            fuzzing_reports(count=100, test_strategy=strategy, mix_freq=2)
