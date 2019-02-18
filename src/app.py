@@ -128,4 +128,5 @@ if __name__ == "__main__":
     print("starting...")
     host = getenv("ADRESTIA_PDV_SVC_HOST", "127.0.0.1")
     port = int(getenv("ADRESTIA_PDV_SVC_PORT", "8999"))
-    run_app(svc_host=host, svc_port=port)
+    results_dir = getenv("ADRESTIA_PDV_DATADIR", "/tmp")
+    run_app(svc_host=host, svc_port=port, results_directory=results_dir)
