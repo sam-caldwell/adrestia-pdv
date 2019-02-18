@@ -48,3 +48,8 @@ Building
 --------
 To build the service, run ```./bin/build.sh```
 Please do not update VERSION.txt or use docker-compose build directly.  See Versioning.
+
+ToDo
+----
+* Emit logs to splunk (structured logs)
+* Emit metrics to statsd for forwarding to monitoring svc.
