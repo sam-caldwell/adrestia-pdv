@@ -35,3 +35,16 @@ Starting the Container
 ```angular2html
 docker-compose up --detach
 ```
+
+Versioning
+----------
+The solution is versioned as follows (updated by the build script for you).
+
+```YYYY.MM.DD``` (where the date/time is set by ```bin/build.sh``` in UTC)
+
+Why do this?  Well, how else should I know when the build was run?  I'm lazy.
+
+Building
+--------
+To build the service, run ```./bin/build.sh```
+Please do not update VERSION.txt or use docker-compose build directly.  See Versioning.
