@@ -1,4 +1,4 @@
-#!/bin/bash -xeu
+#!/bin/bash -eu
 #
 # Local tests and linting.
 # Build container.
@@ -9,7 +9,9 @@ cd ..
 
 [[ ! -f ./VERSION.txt ]] && echo "Missing VERSION.txt" && exit 1
 
-docker run -it ubuntu:latest /bin/bash -c 'echo "$(date +%Y.%m.%d)"' > ./VERSION.txt
+pip install --upgrade pip
+
+docker run -it ubuntu:latest /bin/bash -c 'echo -n "$(date +%Y.%m.%d)"' > ./VERSION.txt
 
 export VERSION="$(cat ./VERSION.txt)"
 
@@ -29,6 +31,15 @@ echo "building $VERSION"
 time pip install -r requirements.txt
 
 time flake8 --exclude venv/ --doctests --count --jobs=10 || exit 1
-time pytest --verbose --exitfirst || exit 1
+time pytest --verbose --exitfirst --disable-warnings || exit 1
 
-time docker-compose build --compress --parallel --build-arg VERSION="$VERSION"
+container_image_name="adrestia-pdv:$VERSION"
+docker build --tag "$container_image_name" --squash --compress ./
+echo "Created adrestia-pdv:$VERSION"
+
+docker images | grep pdv
+
+echo "Tagging for latest"
+docker tag adrestia-pdv:$VERSION adrestia-pdv:latest
+
+docker images | grep pdv
